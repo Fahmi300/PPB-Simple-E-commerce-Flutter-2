@@ -104,7 +104,7 @@ class _ProductListState extends State<ProductList> {
                 setState(() {
                   product.name = nameController.text;
                   product.price = priceController.text;
-                  product.place = priceController.text;
+                  product.place = placeController.text;
                   product.description = descriptionController.text;
                 });
                 Navigator.of(context).pop();
