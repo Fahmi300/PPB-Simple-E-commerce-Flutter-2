@@ -1,22 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:test_flutter/models/product.dart';
 import 'dart:io';
 
-void main() {
+import 'package:test_flutter/services/database_service.dart';
+
+void main() async {
+  await _setup();
   runApp(MaterialApp(
     home: ProductList(),
   ));
 }
 
-class Product {
-  String name;
-  String price;
-  String place;
-  String description;
-  int rating;
-  String imagePath;
-
-  Product({required this.name, required this.price, required this.place, required this.description, required this.rating, required this.imagePath});
+Future<void> _setup() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await DatabaseService.setup();
 }
 
 class ProductList extends StatefulWidget {
@@ -28,6 +28,31 @@ class _ProductListState extends State<ProductList> {
   final ImagePicker _picker = ImagePicker();
   List<Product> products = [];
 
+  StreamSubscription? productsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    productsStream = DatabaseService.db.products
+      .buildQuery<Product>()
+      .watch(
+        fireImmediately: true,
+      )
+      .listen(
+        (data) {
+          setState(() {
+            products = data;
+          });
+        }
+    );
+  }
+
+  @override
+  void dispose() {
+    productsStream?.cancel();
+    super.dispose();
+  }
+
   Future<void> _pickImage(Product product) async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
@@ -35,19 +60,6 @@ class _ProductListState extends State<ProductList> {
         product.imagePath = pickedFile.path;
       });
     }
-  }
-
-  void _addProduct(String name, String price, String place, String description) {
-    setState(() {
-      products.add(Product(
-        name: name,
-        price: price,
-        place: place,
-        description: description,
-        rating: 0,
-        imagePath: '',
-      ));
-    });
   }
 
   void _editProduct(Product product) {
@@ -66,8 +78,8 @@ class _ProductListState extends State<ProductList> {
             children: [
               GestureDetector(
                 onTap: () => _pickImage(product),
-                child: product.imagePath.isNotEmpty
-                    ? Image.file(File(product.imagePath), height: 150, width: double.infinity, fit: BoxFit.cover)
+                child: product.imagePath?.isNotEmpty ?? false
+                    ? Image.file(File(product.imagePath!), height: 150, width: double.infinity, fit: BoxFit.cover)
                     : Container(
                   height: 150,
                   color: Colors.grey[300],
@@ -156,9 +168,24 @@ class _ProductListState extends State<ProductList> {
             ),
             CustomButton(
                 text: 'Add',
-                onPressed: () {
-                  _addProduct(nameController.text, priceController.text, placeController.text, descriptionController.text);
-                  Navigator.of(context).pop();
+                onPressed: () async {
+                  Product newProduct = Product();
+                  newProduct = newProduct.copyWith(
+                    name: nameController.text,
+                    price: priceController.text,
+                    place: placeController.text,
+                    description: descriptionController.text,
+                    rating: 0,
+                    imagePath: '',
+                  );
+                  await DatabaseService.db.writeTxn(
+                    () async {
+                      await DatabaseService.db.products.put(
+                        newProduct,
+                      );
+                    },
+                  );
+                  Navigator.pop(context);
                 },
             ),
           ],
@@ -182,8 +209,8 @@ class _ProductListState extends State<ProductList> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    child: product.imagePath.isNotEmpty
-                        ? Image.file(File(product.imagePath), height: 250, width: double.infinity, fit: BoxFit.cover)
+                    child: product.imagePath?.isNotEmpty ?? false
+                        ? Image.file(File(product.imagePath!), height: 250, width: double.infinity, fit: BoxFit.cover)
                         : Container(
                       height: 250,
                       color: Colors.grey[300],
@@ -191,19 +218,19 @@ class _ProductListState extends State<ProductList> {
                     ),
                   ),
                   SizedBox(height: 10),
-                  Text(product.name, style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold)),
+                  Text(product.name!, style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold)),
                   SizedBox(height: 10),
                   Text("Rp${product.price}", style: TextStyle(fontSize: 25, color: Colors.grey[800])),
                   SizedBox(height: 10),
                   Row(
                     children: [
                       Icon(Icons.location_on, size:20, color: Colors.grey[600]),
-                      Text(product.place, style: TextStyle(fontSize: 20, color: Colors.grey[600])),
+                      Text(product.place!, style: TextStyle(fontSize: 20, color: Colors.grey[600])),
                     ],
                   ),
                   SizedBox(height: 10),
                   Text("Description :", style: TextStyle(fontSize: 19)),
-                  Text(product.description, style: TextStyle(fontSize: 20, color: Colors.grey[800])),
+                  Text(product.description!, style: TextStyle(fontSize: 20, color: Colors.grey[800])),
                   SizedBox(height: 10),
                   CustomButton(
                       text: "Back",
@@ -238,9 +265,9 @@ class _ProductListState extends State<ProductList> {
                 return ProductCard(
                   product: products[index],
                   onEdit: () => _editProduct(products[index]),
-                  onDelete: () {
-                    setState(() {
-                      products.removeAt(index);
+                  onDelete: () async {
+                    await DatabaseService.db.writeTxn(() async {
+                      await DatabaseService.db.products.delete(products[index].id);
                     });
                   },
                   onCardTap: (product) => _showCardDialog(product)
@@ -283,8 +310,8 @@ class ProductCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    child: product.imagePath.isNotEmpty
-                        ? Image.file(File(product.imagePath), height: 150, width: double.infinity, fit: BoxFit.cover)
+                    child: product.imagePath?.isNotEmpty ?? false
+                        ? Image.file(File(product.imagePath!), height: 150, width: double.infinity, fit: BoxFit.cover)
                         : Container(
                       height: 150,
                       color: Colors.grey[300],
@@ -292,7 +319,7 @@ class ProductCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 10),
-                  Text(product.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(product.name!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   SizedBox(height: 5),
                   Text("Rp${product.price}", style: TextStyle(fontSize: 16, color: Colors.grey[800])),
                   SizedBox(height: 5),
@@ -302,7 +329,7 @@ class ProductCard extends StatelessWidget {
             Row(
               children: [
                 Icon(Icons.location_on, size:15, color: Colors.grey[600]),
-                Text(product.place, style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+                Text(product.place!, style: TextStyle(fontSize: 16, color: Colors.grey[600])),
               ],
             ),
             Row(
