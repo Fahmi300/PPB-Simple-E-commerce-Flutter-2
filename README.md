@@ -130,7 +130,7 @@ Database service digunakan untuk insiasi awal dan menyimpan instance Isar ke dal
 Kode diatas berguna untuk membaca data dari database secara real-time, lalu memperbarui UI secara otomatis.
 `initState()` untuk memulai stream dan `dispose()` untuk menghentikan stream.
 
-### Menambahkan Product
+#### Menambahkan Product
 ```dart
 onPressed: () async {
   Product newProduct = Product();
@@ -151,7 +151,7 @@ onPressed: () async {
 Menambahkan product dengan membuat new product dan memasukan semua text dalam controller ke dalam new product. Setelahnya menggunakan
 Database service untuk melakukan insert atau update ke database.
 
-### Mengubah Product
+#### Mengubah Product
 ```dart
 onPressed: () async {
   Product updatedProduct = product.copyWith(
@@ -170,7 +170,7 @@ onPressed: () async {
 ```
 Pada Update product sama dengan Add product hanya berbeda pada nama variable.
 
-### Delete Product
+#### Menghapus Product
 ```dart
 onDelete: () async {
   await DatabaseService.db.writeTxn(() async {
