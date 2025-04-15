@@ -112,15 +112,20 @@ class _ProductListState extends State<ProductList> {
             ),
             CustomButton(
               text: 'Save',
-              onPressed: () {
-                setState(() {
-                  product.name = nameController.text;
-                  product.price = priceController.text;
-                  product.place = placeController.text;
-                  product.description = descriptionController.text;
+              onPressed: () async {
+                Product updatedProduct = product.copyWith(
+                  name: nameController.text,
+                  price: priceController.text,
+                  place: placeController.text,
+                  description: descriptionController.text,
+                  imagePath: product.imagePath ?? '',
+                );
+
+                await DatabaseService.db.writeTxn(() async {
+                    await DatabaseService.db.products.put(updatedProduct);
                 });
-                Navigator.of(context).pop();
-              },
+                Navigator.pop(context);
+              }
             ),
           ],
         );
@@ -136,7 +141,7 @@ class _ProductListState extends State<ProductList> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (context)  {
         return AlertDialog(
           title: Text('Add Product'),
           content: Column(
@@ -178,11 +183,8 @@ class _ProductListState extends State<ProductList> {
                     rating: 0,
                     imagePath: '',
                   );
-                  await DatabaseService.db.writeTxn(
-                    () async {
-                      await DatabaseService.db.products.put(
-                        newProduct,
-                      );
+                  await DatabaseService.db.writeTxn(() async {
+                      await DatabaseService.db.products.put(newProduct);
                     },
                   );
                   Navigator.pop(context);
@@ -262,12 +264,13 @@ class _ProductListState extends State<ProductList> {
               ),
               itemCount: products.length,
               itemBuilder: (context, index) {
+                final product = products[index];
                 return ProductCard(
-                  product: products[index],
-                  onEdit: () => _editProduct(products[index]),
+                  product: product,
+                  onEdit: () => _editProduct(product),
                   onDelete: () async {
                     await DatabaseService.db.writeTxn(() async {
-                      await DatabaseService.db.products.delete(products[index].id);
+                      await DatabaseService.db.products.delete(product.id);
                     });
                   },
                   onCardTap: (product) => _showCardDialog(product)
